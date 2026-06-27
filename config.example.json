@@ -1,0 +1,24 @@
+{
+  "_comment": "复制为 config.json 并填写各字段；fetch = 源星球，upload = 目标星球",
+  "activeProfile": "upload",
+  "profiles": {
+    "upload": {
+      "_comment": "目标星球 — migrate.mjs 中作为 --to 目标",
+      "mcpApiKey": "你的 MCP API Key（32位 hex）",
+      "cookie": "浏览器 zsxq_access_token=...（Playwright 回退用，可选）",
+      "groupId": "目标星球 ID（数字）",
+      "output": "./downloads",
+      "limit": 50,
+      "rateLimitMs": 1500
+    },
+    "fetch": {
+      "_comment": "源星球 — migrate.mjs 中作为 --from 源",
+      "mcpApiKey": "你的 MCP API Key",
+      "cookie": "浏览器 Cookie（可选）",
+      "groupId": "源星球 ID（数字）",
+      "output": "./downloads-fetch",
+      "limit": 50,
+      "rateLimitMs": 1500
+    }
+  }
+}

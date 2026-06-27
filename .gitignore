@@ -1,0 +1,15 @@
+node_modules/
+config.json
+.codebuddy/
+.playwright-profile/
+.playwright-debug/
+.playwright-cli/
+.zsxq-home/
+downloads/
+downloads-fetch/
+migrate-temp/
+migrate-record.json
+migrate-failed.json
+lock/
+logs/
+*.txt

@@ -1,0 +1,21 @@
+{
+  "name": "zsxq_test",
+  "version": "1.0.0",
+  "description": "",
+  "main": "index.js",
+  "scripts": {
+    "download": "node scripts/download-files.mjs",
+    "download-mcp": "node scripts/download-files-mcp.mjs",
+    "migrate": "node scripts/migrate.mjs",
+    "cron-migrate": "node scripts/cron-migrate.mjs",
+    "daemon": "node scripts/daemon-migrate.mjs"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "commonjs",
+  "dependencies": {
+    "playwright": "^1.61.1",
+    "zsxq-cli": "^0.4.9"
+  }
+}
