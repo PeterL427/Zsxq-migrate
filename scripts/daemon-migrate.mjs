@@ -6,7 +6,7 @@
  * 使用 cron-migrate.mjs 的锁机制防止并发。
  *
  * 用法:
- *   node scripts/daemon-migrate.mjs                      # 默认每 5 分钟，查看 40 条
+ *   node scripts/daemon-migrate.mjs                      # 默认每 2 分钟，查看 20 条
  *   node scripts/daemon-migrate.mjs --interval 10        # 每 10 分钟
  *   node scripts/daemon-migrate.mjs --from fetch --to upload --limit 20 --interval 5
  */
@@ -16,14 +16,14 @@ import { join } from 'node:path';
 
 // ── 配置 ────────────────────────────────────────────────────────────────────
 const args = parseArgs();
-const INTERVAL_MIN = args.interval || 5;
+const INTERVAL_MIN = args.interval || 2;
 const INTERVAL_MS = INTERVAL_MIN * 60 * 1000;
 
 const CRON_SCRIPT = join(import.meta.dirname, 'cron-migrate.mjs');
 const cronArgs = [
   '--from', args.from || 'fetch',
   '--to', args.to || 'upload',
-  '--limit', String(args.limit || 40),
+  '--limit', String(args.limit || 20),
 ];
 
 // ── 运行一次迁移 ────────────────────────────────────────────────────────────
@@ -62,7 +62,7 @@ function runMigration() {
 console.log('╔══════════════════════════════════════╗');
 console.log('║   zsxq 迁移守护进程 v1.0             ║');
 console.log('╚══════════════════════════════════════╝');
-console.log(`  间隔: ${INTERVAL_MIN} 分钟 | 每批 ${args.limit || 40} 条 | ${args.from || 'fetch'} → ${args.to || 'upload'}`);
+console.log(`  间隔: ${INTERVAL_MIN} 分钟 | 每批 ${args.limit || 20} 条 | ${args.from || 'fetch'} → ${args.to || 'upload'}`);
 console.log(`  按 Ctrl+C 停止\n`);
 
 // 首次立即运行
