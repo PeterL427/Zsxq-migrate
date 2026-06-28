@@ -14,7 +14,7 @@
 
 import { spawnSync } from 'node:child_process';
 import { existsSync, mkdirSync, writeFileSync, readFileSync, unlinkSync, rmSync, createWriteStream } from 'node:fs';
-import { join, basename } from 'node:path';
+import { join } from 'node:path';
 import { get as httpGet } from 'node:http';
 import { get as httpsGet } from 'node:https';
 import { publishViaPlaywright } from './publish-pw.mjs';
@@ -414,9 +414,9 @@ async function main() {
           } else {
             console.log(`  ⚠️  CLI 发布失败: ${errMsg.slice(0, 100)}，回退 Playwright...`);
           }
-          // 获取目标账号的 cookie（发布到 DST 星球）
-          const dstProfile = CONFIG.profiles?.[DST.name] || CONFIG.profiles?.upload || {};
-          const pwCookie = dstProfile.cookie || '';
+          // 获取源账号（fetch）cookie — upload 账户 CLI 额度已耗尽，PW 回退用 fetch cookie
+          const srcProfile = CONFIG.profiles?.[SRC.name] || CONFIG.profiles?.fetch || {};
+          const pwCookie = srcProfile.cookie || '';
           if (pwCookie) {
             const pwResult = await publishViaPlaywright({
               text: content,
@@ -442,8 +442,8 @@ async function main() {
           newId = await publishTextOnly(tagger, content);
         } catch (mcpErr) {
           console.log(`  ⚠️  MCP 发布失败: ${mcpErr.message?.slice(0, 100)}，回退 Playwright...`);
-          const dstProfile = CONFIG.profiles?.[DST.name] || CONFIG.profiles?.upload || {};
-          const pwCookie = dstProfile.cookie || '';
+          const srcProfile = CONFIG.profiles?.[SRC.name] || CONFIG.profiles?.fetch || {};
+          const pwCookie = srcProfile.cookie || '';
           if (pwCookie) {
             const pwResult = await publishViaPlaywright({
               text: content,

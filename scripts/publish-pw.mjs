@@ -240,7 +240,7 @@ export async function publishViaPlaywright({
       const config = loadConfig();
       const uploadProfile = config.profiles?.upload || config.profiles?.account1 || {};
       const fetchProfile = config.profiles?.fetch || config.profiles?.account2 || {};
-      cookie = uploadProfile.cookie || fetchProfile.cookie || '';
+      cookie = fetchProfile.cookie || uploadProfile.cookie || '';
     }
     if (!cookie) {
       return {
@@ -805,7 +805,7 @@ if (isMain) {
     process.exit(result.success ? 0 : 1);
   }
 
-  if (!cookie) cookie = uploadProfile.cookie || fetchProfile.cookie || '';
+  if (!cookie) cookie = fetchProfile.cookie || uploadProfile.cookie || '';
 
   if (interactive) {
     // 交互模式
