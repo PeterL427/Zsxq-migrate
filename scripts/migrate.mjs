@@ -18,6 +18,7 @@ import { join } from 'node:path';
 import { get as httpGet } from 'node:http';
 import { get as httpsGet } from 'node:https';
 import { publishViaPlaywright } from './publish-pw.mjs';
+import { uploadFileToIma, getFolderIdByTags, getFolderNameById } from './ima-upload.mjs';
 
 // ── 配置 ────────────────────────────────────────────────────────────────────
 
@@ -362,12 +363,80 @@ async function main() {
       if (files.length) console.log(`  附件: ${files.length} 个`);
       if (hashtags.length) console.log(`  标签: ${hashtags.join(', ')}`);
 
-      // 跳过带附件(files)的帖 — 文件上传受限，仅迁移纯文字/图片帖
+      // 带附件(files)的帖 → 上传文件到 IMA 知识库（正文丢弃，不发目标星球）
       if (files.length > 0) {
-        console.log(`  ⏭️  带附件帖，跳过`);
-        skipCount++;
-        record[srcId] = { newId:'skipped_has_files', time:new Date().toISOString() };
-        saveRecord(record);
+        const folderId = getFolderIdByTags(hashtags);
+        if (!folderId) {
+          console.log(`  ⏭️  带附件但无匹配 IMA 文件夹的 tag，跳过 (tags: ${hashtags.join(', ') || '无'})`);
+          skipCount++;
+          record[srcId] = { newId:'skipped_no_ima_folder', time:new Date().toISOString() };
+          saveRecord(record);
+          continue;
+        }
+
+        const folderName = getFolderNameById(folderId);
+        console.log(`  📤 IMA 上传 → 文件夹「${folderName}」(${files.length} 个文件)...`);
+
+        if (dryRun) {
+          console.log(`     [dry-run] 将下载并上传 ${files.length} 个文件`);
+          successCount++;
+          continue;
+        }
+
+        // 下载附件到临时目录
+        const imaFiles = [];
+        for (let j = 0; j < files.length; j++) {
+          const f = files[j];
+          if (!f.file_id) continue;
+          try {
+            const dlResult = await reader.callTool('call_zsxq_api', { method:'GET', path:`/v2/files/${f.file_id}/download_url` });
+            const dlData = JSON.parse(dlResult.content[0].text);
+            const dlUrl = dlData.resp_data?.download_url || dlData.body?.resp_data?.download_url || '';
+            if (!dlUrl) { console.log(`     ⚠️  附件${j+1} 下载链接为空`); continue; }
+            const safeName = (f.name || 'file').replace(/[\\/:*?"<>|]/g, '_');
+            const fpath = join(TEMP_DIR, safeName);
+            await downloadFile(dlUrl, fpath);
+            imaFiles.push(fpath);
+          } catch (e) { console.log(`     ❌ 下载附件${j+1} 失败: ${e.message}`); }
+        }
+
+        if (imaFiles.length === 0) {
+          console.log(`  ❌ 无文件成功下载，跳过 IMA 上传`);
+          failCount++;
+          failed.push({ sourceId:srcId, error:'IMA上传:无文件下载成功', time:new Date().toISOString() });
+          saveFailed(failed);
+          continue;
+        }
+
+        // 逐个上传到 IMA
+        let imaSuccess = 0;
+        let imaFail = 0;
+        for (const fp of imaFiles) {
+          const result = await uploadFileToIma(fp, folderId, {
+            onLog: (msg) => console.log(msg),
+          });
+          if (result.success) imaSuccess++;
+          else { imaFail++; console.log(`     ❌ ${fp.split(/[/\\]/).pop()}: ${result.error}`); }
+        }
+
+        // 清理临时文件
+        for (const fp of imaFiles) { try { unlinkSync(fp); } catch {} }
+
+        if (imaSuccess > 0) {
+          console.log(`  ✅ IMA 上传完成: ${imaSuccess}/${imaFiles.length} 成功`);
+          successCount++;
+          record[srcId] = { newId:`ima_uploaded_${imaSuccess}`, time:new Date().toISOString(), imaFolder:folderName };
+          saveRecord(record);
+          if (failedSet.has(srcId)) {
+            failed = failed.filter(f => f.sourceId !== srcId);
+            saveFailed(failed);
+          }
+        } else {
+          console.log(`  ❌ IMA 上传全部失败`);
+          failCount++;
+          failed.push({ sourceId:srcId, error:'IMA上传全部失败', time:new Date().toISOString() });
+          saveFailed(failed);
+        }
         continue;
       }
 

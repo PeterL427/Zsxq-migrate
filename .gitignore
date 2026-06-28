@@ -10,6 +10,8 @@ downloads-fetch/
 migrate-temp/
 migrate-record.json
 migrate-failed.json
+ima-account-state.json
+ima-scan-report.json
 lock/
 logs/
 *.txt
