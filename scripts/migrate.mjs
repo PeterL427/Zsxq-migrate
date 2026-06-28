@@ -362,6 +362,15 @@ async function main() {
       if (files.length) console.log(`  附件: ${files.length} 个`);
       if (hashtags.length) console.log(`  标签: ${hashtags.join(', ')}`);
 
+      // 跳过带附件(files)的帖 — 文件上传受限，仅迁移纯文字/图片帖
+      if (files.length > 0) {
+        console.log(`  ⏭️  带附件帖，跳过`);
+        skipCount++;
+        record[srcId] = { newId:'skipped_has_files', time:new Date().toISOString() };
+        saveRecord(record);
+        continue;
+      }
+
       if (dryRun) {
         successCount++;
         continue;
