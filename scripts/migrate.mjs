@@ -310,6 +310,10 @@ async function main() {
 
   console.log(`  待处理: ${topicIds.length} 条\n`);
 
+  // 反转处理顺序：源星球 API 返回最新在前，收集顺序为新→旧。
+  // 反转后变为旧→新，最旧的先发，最新的最后发 → 最新帖出现在目标星球顶部，与源星球顺序一致。
+  topicIds.reverse();
+
   if (topicIds.length === 0) {
     console.log('没有待处理的主题，退出。');
     process.exit(0);
