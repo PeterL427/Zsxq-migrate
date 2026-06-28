@@ -498,8 +498,10 @@ export async function publishViaPlaywright({
       console.log(`  📎 上传完成: ${uploadSuccess.length}/${filePaths.length}`);
     }
 
-    // 等待页面稳定
-    await page.waitForTimeout(2000);
+    // 等待页面稳定（文件越多等越久，每文件额外 1 秒）
+    const uploadWait = 2000 + uploadSuccess.length * 1000;
+    console.log(`  ⏳ 等待上传完成 (${(uploadWait / 1000).toFixed(1)}s)...`);
+    await page.waitForTimeout(uploadWait);
 
     // 5. 提交发布 — 监听网络请求捕获 topic_id
     // 创建 API 响应监听
@@ -540,13 +542,25 @@ export async function publishViaPlaywright({
       try {
         const cnt = await btn.count();
         if (cnt > 0) {
-          await btn.waitFor({ state: 'visible', timeout: 3000 });
+          await btn.waitFor({ state: 'visible', timeout: 5000 });
+          await btn.scrollIntoViewIfNeeded();
+          await page.waitForTimeout(500);
           await btn.click();
           console.log(`  🚀 已点击发布 (选择器: ${sel})`);
           submitted = true;
           break;
         }
       } catch { continue; }
+    }
+
+    if (!submitted) {
+      // 最后尝试：Enter 键提交
+      console.log('  ⚠️  未找到发布按钮，尝试 Enter 提交...');
+      try {
+        await page.keyboard.press('Enter');
+        await page.waitForTimeout(2000);
+        submitted = true;
+      } catch {}
     }
 
     if (!submitted) {
