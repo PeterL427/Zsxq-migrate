@@ -23,10 +23,12 @@ git push -u origin main
 
 | 文件/目录 | 原因 |
 |------|------|
-| `config.json` | 含 MCP API Key、Cookie |
+| `config.json` | 含 MCP API Key、Cookie、IMA 凭证 |
 | `.playwright-profile/` | 浏览器登录会话 |
 | `.playwright-debug/` | 调试截图 |
 | `migrate-record.json` | 迁移记录 |
+| `migrate-failed.json` | 失败记录 |
+| `ima-account-state.json` | IMA 多账号轮换状态 |
 | `downloads/`、`downloads-fetch/` | 下载文件 |
 | `node_modules/` | npm 依赖 |
 
@@ -35,10 +37,13 @@ git push -u origin main
 **这些文件不上传 Git，需要单独 scp 到服务器。**
 
 ```bash
-# 步骤 1：确认 config.json 已配置两份 MCP Key
+# 步骤 1：确认 config.json 已配置
 cat config.json
-# → profiles.fetch.mcpApiKey = "cde5fe..."   (源账号，读取用)
-# → profiles.upload.mcpApiKey = "6b38c7..."  (目标账号，发布用)
+# → profiles.fetch.mcpApiKey   = "cde5fe..."   (源账号，读取用)
+# → profiles.upload.mcpApiKey  = "6b38c7..."   (目标账号，发布用)
+# → ima.accounts[]             = [{clientId, apiKey}, ...]  (IMA 上传凭证)
+# → ima.knowledgeBaseId        = "1ACD5..."    (IMA 知识库 ID)
+# → ima.tagFolderMap           = { "#tag#": "folder_xxx", ... }  (tag→文件夹映射)
 
 # 步骤 2：桌面端登录 Playwright（生成浏览器会话）
 node scripts/publish-pw.mjs --login
@@ -190,7 +195,7 @@ HOME=$PWD/.zsxq-home npx zsxq-cli auth status
 pm2 start scripts/daemon-migrate.mjs \
   --name migrate \
   --env HOME=/home/ubuntu/zsxq_test/.zsxq-home \
-  -- --from fetch --to upload --limit 40
+  -- --from fetch --to upload --limit 20
 
 # 或用 systemd: 在 ExecStart 前加 Environment=
 # Environment="HOME=/home/ubuntu/zsxq_test/.zsxq-home"
@@ -243,7 +248,7 @@ npm install -g pm2
 pm2 start scripts/daemon-migrate.mjs \
   --name migrate \
   --node-args="" \
-  -- --from fetch --to upload --limit 40
+  -- --from fetch --to upload --limit 20
 
 # 查看启动日志
 pm2 logs migrate --lines 30
@@ -265,7 +270,7 @@ After=network.target
 Type=simple
 User=ubuntu
 WorkingDirectory=/home/ubuntu/zsxq_test
-ExecStart=/usr/bin/node scripts/daemon-migrate.mjs --from fetch --to upload --limit 40
+ExecStart=/usr/bin/node scripts/daemon-migrate.mjs --from fetch --to upload --limit 20
 Restart=always
 RestartSec=10
 StandardOutput=append:/home/ubuntu/zsxq_test/logs/daemon.log
@@ -304,9 +309,17 @@ sudo systemctl status zsxq-migrate
    ├── 服务器: 如无法直接登录，可依赖 Playwright 回退
    └── 位置: Windows Credential Manager / macOS Keychain / ~/.config/
 
+4. IMA OpenAPI 凭证 (config.json → ima.accounts)
+   ├── 用途: 带文件帖上传到腾讯 IMA 知识库
+   ├── 获取: https://ima.qq.com/agent-interface → 创建 Client ID + API Key
+   ├── 配置: config.json 的 ima.accounts 数组，支持多账号轮换
+   ├── IMA skill 脚本: vendor/ima-skills/（项目自包含，无需额外安装）
+   └── 限流: 单账号约 200 文件/天，耗尽自动切换下一账号
+
 发布通道降级:
-  带文件 → CLI (+create --files) → 失败 → Playwright 回退
+  带文件 → IMA 知识库上传（按 tag 分类到对应文件夹）
   纯文字 → MCP (create_topic)    → 失败 → Playwright 回退
+  带图片 → CLI (+create --files)  → 失败 → Playwright 回退
 ```
 
 ---
@@ -336,12 +349,38 @@ tail -50 logs/daemon.log
 
 | 操作 | 命令 |
 |------|------|
+| 停止守护进程 | `pm2 stop migrate` |
+| 启动守护进程 | `pm2 start migrate` |
 | 重启守护进程 | `pm2 restart migrate` |
+| 彻底删除进程 | `pm2 delete migrate` |
 | 更新代码 | `git pull && npm install && pm2 restart migrate` |
 | Playwright 更新 | `npx playwright install chromium --with-deps` |
 | Cookie 过期 | 桌面 `--login` → `scp .playwright-profile/` → `pm2 restart migrate` |
 | 清理日志 | `rm logs/*.log` 或配置 `logrotate` |
 | 查看失败记录 | `cat migrate-failed.json` |
+| 查看 IMA 账号 | `node scripts/ima-upload.mjs --accounts` |
+| 清理僵尸锁 | `rm lock/migrate.lock`（确认无进程运行后） |
+
+### 停止进程的几种方式
+
+```bash
+# PM2 管理（推荐）
+pm2 stop migrate          # 停止但保留进程配置
+pm2 delete migrate        # 彻底删除进程
+
+# 直接杀进程（非 PM2 场景）
+pkill -f daemon-migrate   # 按进程名杀
+pkill -f cron-migrate     # 杀单次迁移进程
+
+# systemd 方式
+sudo systemctl stop zsxq-migrate
+sudo systemctl disable zsxq-migrate
+
+# 停止后清理可能残留的锁文件
+rm -f lock/migrate.lock
+```
+
+> ⚠️ 强制杀进程后，`lock/migrate.lock` 可能残留，下次启动会报"上一个实例仍在运行"。手动删除即可。
 
 ---
 

@@ -75,9 +75,9 @@ function shouldSwitchAccount(resp) {
   if (!resp) return false;
   // 业务错误码
   if (resp.code === 110021 || resp.code === 110030) return true;
-  // 错误消息关键词
+  // 错误消息关键词（中英文）
   const msg = (resp.msg || '').toLowerCase();
-  if (/频控|限制|limit|quota|rate|exceed|too many|throttl/.test(msg)) return true;
+  if (/频控|限制|limit|quota|rate|exceed|too many|throttl|超限|超量|频率|稍后重试|明日再试/.test(msg)) return true;
   return false;
 }
 
@@ -408,6 +408,7 @@ export async function uploadFileToIma(filePath, folderId, options = {}) {
       }
       log(`     🔄 切换到账号: ${next.name || `account${next._index + 1}`}`);
       currentAccount = next;
+      await new Promise(r => setTimeout(r, 2000)); // 切换后短暂等待，避免立即打新账号
     } else {
       // 非限流错误，不切换账号，直接返回失败
       break;
